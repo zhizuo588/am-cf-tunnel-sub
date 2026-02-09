@@ -9,7 +9,7 @@ let id = base64Decode('ZWM4NzJkOGYtNzJiMC00YTA0LWI2MTItMDMyN2Q4NWUxOGVk');
 let uuid;
 let host;
 
-let paddr;
+//let paddr;
 
 let s5 = '';
 let socks5Enable = false;
@@ -140,9 +140,9 @@ async function mainHandler({ req, url, headers, res, env }) {
         proxyIPsAll.push(...fromKv);
     }
     proxyIPsAll = [...new Set(proxyIPsAll)];
-    if (proxyIPsAll.length > 0) {
-        paddr = proxyIPsAll[Math.floor(Math.random() * proxyIPsAll.length)];
-    }
+    // if (proxyIPsAll.length > 0) {
+    //     paddr = proxyIPsAll[Math.floor(Math.random() * proxyIPsAll.length)];
+    // }
 
     nat64 = url.searchParams.get('NAT64') || getEnvVar('NAT64', env) || NAT64 || nat64;
     const nat64PrefixUrl = url.searchParams.get('NAT64_PREFIX') || getEnvVar('NAT64_PREFIX', env);
@@ -200,10 +200,18 @@ async function mainHandler({ req, url, headers, res, env }) {
         return sendResponse(html, userAgent, res);
     }
     if (url.pathname === `/${id}`) {
+        let paddr;
+		if (proxyIPsAll.length > 0) {
+			paddr = proxyIPsAll[Math.floor(Math.random() * proxyIPsAll.length)];
+		}
         const html = await getConfig(rawHost, uuid, host, paddr, parsedSocks5, userAgent, url, protType, nat64, hostRemark);
         return sendResponse(html, userAgent, res);
     }
     if (url.pathname === `/${fakeUserId}`) {
+        let paddr;
+		if (proxyIPsAll.length > 0) {
+			paddr = proxyIPsAll[Math.floor(Math.random() * proxyIPsAll.length)];
+		}
         const html = await getConfig(rawHost, uuid, host, paddr, parsedSocks5, 'CF-FAKE-UA', url, protType, nat64, hostRemark);
         return sendResponse(html, 'CF-FAKE-UA', res);
     }
@@ -676,7 +684,7 @@ async function getConfig(rawHost, userId, host, proxyIP, parsedSocks5, userAgent
     const ipUrlTxtAndCsv = await getIpUrlTxtAndCsv(noTLS, ipUrlTxt, ipUrlCsv, num);
 
     log(`txt: ${ipUrlTxtAndCsv.txt} \n csv: ${ipUrlTxtAndCsv.csv}`);
-    let content = await getConfigContent(rawHost, userAgent, _url, host, fakeHostName, fakeUserId, noTLS, ipUrlTxtAndCsv.txt, ipUrlTxtAndCsv.csv, protType, nat64, hostRemark);
+    let content = await getConfigContent(rawHost, userAgent, _url, host, fakeHostName, fakeUserId, noTLS, ipUrlTxtAndCsv.txt, ipUrlTxtAndCsv.csv, protType, nat64, hostRemark, proxyIP);
 
     return _url.pathname === `/${fakeUserId}` ? content : revertFakeInfo(content, userId, host);
 }
@@ -752,21 +760,21 @@ function getCLinkConfig(protType, host, address, port, uuid, path, tls, fp) {
     return `- {type: ${xDe(t, k)}, name: ${host}, server: ${xDe(a, k)}, port: ${xDe(p, k)}, password: ${xDe(u, k)}, network: ${network}, tls: ${tls[1]}, udp: false, sni: ${host}, client-fingerprint: ${fp}, skip-cert-verify: true,  ws-opts: {path: ${path}, headers: {Host: ${host}}}}`;
 }
 
-async function getConfigContent(rawHost, userAgent, _url, host, fakeHostName, fakeUserId, noTLS, ipUrlTxt, ipUrlCsv, protType, nat64, hostRemark) {
+async function getConfigContent(rawHost, userAgent, _url, host, fakeHostName, fakeUserId, noTLS, ipUrlTxt, ipUrlCsv, protType, nat64, hostRemark, proxyIP) {
     log(`------------getConfigContent------------------`);
     const uniqueIpTxt = [...new Set([...ipUrlTxt, ...ipUrlCsv])];
     let responseBody;
     log(`[getConfigContent]---> protType: ${protType}`);
     if (!protType) {
         protType = doubleBase64Decode(protTypeBase64);
-        const responseBody1 = splitNodeData(uniqueIpTxt, noTLS, fakeHostName, fakeUserId, userAgent, protType, nat64, hostRemark);
-        const responseBodyTop = splitNodeData(ipLocal, noTLS, fakeHostName, fakeUserId, userAgent, protType, nat64, hostRemark);
+        const responseBody1 = splitNodeData(uniqueIpTxt, noTLS, fakeHostName, fakeUserId, userAgent, protType, nat64, hostRemark, proxyIP);
+        const responseBodyTop = splitNodeData(ipLocal, noTLS, fakeHostName, fakeUserId, userAgent, protType, nat64, hostRemark, proxyIP);
         protType = doubleBase64Decode(protTypeBase64Tro);
-        const responseBody2 = splitNodeData(uniqueIpTxt, noTLS, fakeHostName, fakeUserId, userAgent, protType, nat64, hostRemark);
+        const responseBody2 = splitNodeData(uniqueIpTxt, noTLS, fakeHostName, fakeUserId, userAgent, protType, nat64, hostRemark, proxyIP);
         responseBody = [responseBodyTop, responseBody1, responseBody2].join('\n');
     } else {
-        const responseBodyTop = splitNodeData(ipLocal, noTLS, fakeHostName, fakeUserId, userAgent, protType, nat64, hostRemark);
-        responseBody = splitNodeData(uniqueIpTxt, noTLS, fakeHostName, fakeUserId, userAgent, protType, nat64, hostRemark);
+        const responseBodyTop = splitNodeData(ipLocal, noTLS, fakeHostName, fakeUserId, userAgent, protType, nat64, hostRemark, proxyIP);
+        responseBody = splitNodeData(uniqueIpTxt, noTLS, fakeHostName, fakeUserId, userAgent, protType, nat64, hostRemark, proxyIP);
         responseBody = [responseBodyTop, responseBody].join('\n');
     }
     responseBody = base64Encode(responseBody);
@@ -814,7 +822,7 @@ function isSingboxCondition(userAgent, _url) {
     return userAgent.includes('sing-box') || userAgent.includes('singbox') || ((_url.searchParams.has('singbox') || _url.searchParams.has('sb')) && !userAgent.includes('subConverter'));
 }
 
-function splitNodeData(uniqueIpTxt, noTLS, host, uuid, userAgent, protType, nat64, hostRemark) {
+function splitNodeData(uniqueIpTxt, noTLS, host, uuid, userAgent, protType, nat64, hostRemark, proxyIP) {
     log(`splitNodeData----> \n host: ${host} \n uuid: ${uuid} \n protType: ${protType} \n hostRemark: ${hostRemark}`);
 
     const regionMap = {
@@ -878,7 +886,7 @@ function splitNodeData(uniqueIpTxt, noTLS, host, uuid, userAgent, protType, nat6
             remarks = regionMap[rmKey];
         }
 
-        proxyip = proxyip || paddr;
+        proxyip = proxyip || proxyIP;
         log(`splitNodeData--final--> \n address: ${address} \n port: ${port} \n remarks: ${remarks} \n proxyip: ${proxyip}`);
 
         if (noTLS !== 'true' && portSet_http.has(parseInt(port))) {
